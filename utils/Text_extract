@@ -1,0 +1,62 @@
+#extract text from user's uploaded files (pdf, image...etc)
+import fitz  # PyMuPDF
+import pytesseract
+import pdfplumber
+from PIL import Image
+import io
+
+#used both pdfplumber and pymupdf to get best out of both library
+def extract_text_pdfplumber(pdf_path):
+    text = ""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += f"\n\n[Page {page.page_number}]\n{page_text}"
+        return text.strip()
+    except:
+        return None
+
+
+def extract_text_pymupdf(pdf_path):
+    text = ""
+    try:
+        doc = fitz.open(pdf_path)
+        for i, page in enumerate(doc):
+            page_text = page.get_text()
+            if page_text.strip():
+                text += f"\n\n[Page {i+1}]\n{page_text}"
+        return text.strip()
+    except:
+        return None
+
+
+def extract_text_ocr(pdf_path):
+    text = ""
+    try:
+        doc = fitz.open(pdf_path)
+        for i, page in enumerate(doc):
+            pix = page.get_pixmap(dpi=300)
+            img = Image.open(io.BytesIO(pix.tobytes("png")))
+            ocr_text = pytesseract.image_to_string(img)
+            text += f"\n\n[Page {i+1} OCR]\n{ocr_text}"
+        return text.strip()
+    except:
+        return None
+
+
+def extract_text_best(pdf_path):
+    # Try pdfplumber first (best layout/text)
+    text = extract_text_pdfplumber(pdf_path)
+    if text and len(text) > 100:
+        return text, "pdfplumber"
+
+    # Fallback to PyMuPDF
+    text = extract_text_pymupdf(pdf_path)
+    if text and len(text) > 100:
+        return text, "pymupdf"
+
+    # Fallback to OCR
+    text = extract_text_ocr(pdf_path)
+    return text, "ocr"
